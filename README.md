@@ -157,11 +157,16 @@ databricks-learning-journey/
 
 ## Roadmap
 
-- [ ] Setup conta Azure + trial
-- [ ] Criar ADLS Gen2 + container bronze/silver/gold
-- [ ] Criar Azure Databricks workspace
-- [ ] Ligar GitHub ao Databricks (Git Folders)
-- [ ] Registar Alpha Vantage + obter API key
+- [x] Setup conta Azure + trial
+- [x] Criar ADLS Gen2 + container bronze/silver/gold
+- [x] Criar Azure Databricks workspace
+- [x] Ligar GitHub ao Databricks (Git Folders)
+- [x] Ligar o ADLS ao Databricks
+    - [x] Criar o Access Connector
+    - [x] Dar permissão ao Access Connector no ADLS
+    - [x] Ligar o Access Connector ao Databricks
+    - [x] Criar o External Location
+- [x] Registar Alpha Vantage + obter API key
 - [ ] Notebook Bronze — Auto Loader
 - [ ] Notebook Silver — DLT + Expectations
 - [ ] Notebook Gold — métricas
