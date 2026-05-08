@@ -1,0 +1,14 @@
+{
+  "meta_fields": {
+    "2. Symbol": "symbol",
+    "3. Last Refreshed": "last_refreshed",
+    "5. Time Zone": "time_zone"
+  },
+  "price_fields": {
+    "1. open": "open",
+    "2. high": "high",
+    "3. low": "low",
+    "4. close": "close",
+    "5. volume": "volume"
+  }
+}
