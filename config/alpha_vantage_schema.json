@@ -1,4 +1,8 @@
 {
+  "sections": {
+    "meta": "Meta Data",
+    "time_series": "Time Series (Daily)"
+  },
   "meta_fields": {
     "2. Symbol": "symbol",
     "3. Last Refreshed": "last_refreshed",
