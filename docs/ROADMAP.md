@@ -73,6 +73,8 @@ Goal: end-to-end Bronze → Silver → Gold pipeline with manual batch ingestion
 - [ ] ML model integration
 - [ ] Time travel demonstrations
 - [ ] Multi-source unification (Yahoo Finance, Bloomberg)
+- [ ] **dbt alternative** (bonus) — re-implement Silver/Gold using dbt 
+      to demonstrate cross-platform skill
 
 ---
 
