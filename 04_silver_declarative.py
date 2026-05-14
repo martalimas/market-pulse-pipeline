@@ -9,7 +9,7 @@ BRONZE_INGESTION_PATH = (
 
 # DIMENSION TABLE — silver_dim_stock
 @dlt.table(
-    name="silver_dim_stock", #Nome da tabela que vai aparecer no Catalog. Sem isto, o Databricks usaria o nome da função.
+    name="dim_stock", #Nome da tabela que vai aparecer no Catalog. Sem isto, o Databricks usaria o nome da função.
     comment="Stock dimension table — one row per symbol with last refresh date and time zone", ## Documentação que aparece no Catalog quando alguém olha para a tabela. Boas práticas — torna a tabela auto-explicativa.
 )
 
@@ -37,7 +37,7 @@ def silver_dim_stock():
 # FACT TABLE — silver_fact_prices
 
 @dlt.table(
-    name="silver_fact_prices",
+    name="fact_prices",
     comment="Daily stock prices fact table with OHLCV values and natural composite key (symbol + trade_date)",
 )
 #Cada @dlt.expect_or_drop("nome", "condição") é uma regra de qualidade declarativa:
