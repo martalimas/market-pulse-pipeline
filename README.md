@@ -255,6 +255,17 @@ For architectural decisions: [`docs/architecture_decisions.md`](docs/architectur
    SCD Type 2, RSI, ML integration, dbt
 ```
 
+## Dashboard
+
+Live dashboard built in Databricks SQL — 5 visualizations:
+- Stock closing prices daily evolution (6 stocks)
+- AAPL close vs moving averages (7d, 30d)
+- Average daily volume by stock
+- Stock performance — return since start (%)
+- Latest stock prices table
+
+🔗 [View Dashboard] https://adb-7405604908512990.10.azuredatabricks.net/dashboardsv3/01f150831ad81008a4631c4b52601185/published?o=7405604908512990
+
 ---
 
 *Built as a portfolio project demonstrating end-to-end data engineering on Azure Databricks.  

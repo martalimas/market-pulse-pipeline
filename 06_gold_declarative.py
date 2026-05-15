@@ -8,9 +8,9 @@ SILVER_CATALOG = "market_pulse_databricks"
 SILVER_SCHEMA = "silver"
 
 
-# ============================================
+
 # 1. gold_daily_summary
-# ============================================
+
 
 @dlt.table(
     name="daily_summary",
@@ -35,9 +35,9 @@ def daily_summary():
     )
 
 
-# ============================================
+
 # 2. gold_volume_analysis
-# ============================================
+
 
 @dlt.table(
     name="volume_analysis",
@@ -73,9 +73,7 @@ def volume_analysis():
     return spark.sql(query)
 
 
-# ============================================
 # 3. gold_moving_averages
-# ============================================
 
 @dlt.table(
     name="moving_averages",
@@ -116,9 +114,9 @@ def moving_averages():
     return spark.sql(query)
 
 
-# ============================================
+
 # 4. gold_volatility
-# ============================================
+
 
 @dlt.table(
     name="volatility",
@@ -167,9 +165,8 @@ def volatility():
     return spark.sql(query)
 
 
-# ============================================
 # 5. gold_stock_comparison
-# ============================================
+
 
 @dlt.table(
     name="stock_comparison",
