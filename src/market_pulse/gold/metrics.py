@@ -5,6 +5,7 @@
 import logging
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from market_pulse.utils import write_delta_table
 
 from market_pulse.config import (
     SILVER_FACT_PRICES_PATH,
@@ -133,16 +134,3 @@ def build_stock_comparison(spark: SparkSession) -> DataFrame:
     return spark.sql(query)
 
 
-def write_gold_table(
-    df: DataFrame,
-    path: str,
-    table_name: str,
-    mode: str = "overwrite",
-    partition_by: list = None
-) -> None:
-    """Writes a DataFrame as Delta to the Gold layer."""
-    writer = df.write.format("delta").mode(mode)
-    if partition_by:
-        writer = writer.partitionBy(partition_by)
-    writer.save(path)
-    logging.info(f"✅ {table_name} written to {path}")

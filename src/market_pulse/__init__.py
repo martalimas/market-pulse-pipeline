@@ -1,0 +1,1 @@
+from market_pulse.utils import write_delta_table

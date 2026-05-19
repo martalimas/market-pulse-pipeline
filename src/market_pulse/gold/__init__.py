@@ -5,5 +5,4 @@ from market_pulse.gold.metrics import (
     build_moving_averages,
     build_volatility,
     build_stock_comparison,
-    write_gold_table
 )
