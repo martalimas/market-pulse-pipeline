@@ -1,6 +1,7 @@
 # conftest.py — fixtures partilhadas por todos os testes É um dado ou objecto preparado antes do teste correr. Em vez de repetir o mesmo setup em cada teste, defines uma vez e reutilizas:
 
 import pytest
+from pyspark.sql import SparkSession
 
 @pytest.fixture
 def sample_api_response():
@@ -38,3 +39,23 @@ def rate_limit_response():
 def error_response():
     """Simula resposta de erro da API."""
     return {"Error Message": "Invalid API call."}
+
+@pytest.fixture(scope="session")
+def spark():
+    """
+    Returns existing SparkSession in Databricks,
+    or creates a local one for development.
+    """
+    from pyspark.sql import SparkSession
+    
+    # Databricks já tem uma SparkSession activa
+    existing = SparkSession.getActiveSession()
+    if existing is not None:
+        return existing
+    
+    # Local development
+    return (SparkSession.builder
+        .appName("market-pulse-tests")
+        .config("spark.sql.shuffle.partitions", "1")
+        .getOrCreate()
+    )    
