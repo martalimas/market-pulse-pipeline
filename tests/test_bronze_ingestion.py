@@ -4,6 +4,8 @@ import pytest
 import sys
 import os
 from unittest.mock import patch, MagicMock
+from market_pulse.ingestion.api import fetch_stock, RateLimitError, InvalidSymbolError
+
 
 # Adiciona src/ ao path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -30,7 +32,7 @@ def test_fetch_stock_rate_limit(rate_limit_response):
         mock_get.return_value.json.return_value = rate_limit_response
         mock_get.return_value.raise_for_status = MagicMock()
 
-        with pytest.raises(ValueError, match="Rate limit"):
+        with pytest.raises(RateLimitError):
             fetch_stock("AAPL", "fake_key")
 
 
@@ -40,5 +42,5 @@ def test_fetch_stock_api_error(error_response):
         mock_get.return_value.json.return_value = error_response
         mock_get.return_value.raise_for_status = MagicMock()
 
-        with pytest.raises(ValueError, match="API error"):
+        with pytest.raises(InvalidSymbolError):
             fetch_stock("AAPL", "fake_key")

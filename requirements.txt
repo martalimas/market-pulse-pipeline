@@ -1,0 +1,6 @@
+tenacity
+pyspark
+requests
+azure-identity
+azure-keyvault-secrets
+azure-storage-file-datalake
