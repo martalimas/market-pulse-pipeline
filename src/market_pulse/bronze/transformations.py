@@ -8,9 +8,12 @@ from pyspark.sql.functions import col
 
 from market_pulse.bronze.schema import json_schema
 from market_pulse.config import BRONZE_INGESTION_PATH
+from market_pulse.logger import get_logger
+
+_default_logger = get_logger(__name__)
 
 
-def process_batch(batch_df: DataFrame, batch_id: int) -> None:
+def process_batch(batch_df: DataFrame, batch_id: int, logger=None) -> None:
     """
     Transforms a raw JSON micro-batch into flat Delta rows.
     Called by Auto Loader via foreachBatch.
@@ -23,6 +26,8 @@ def process_batch(batch_df: DataFrame, batch_id: int) -> None:
         batch_df: Raw DataFrame from Auto Loader
         batch_id: Micro-batch identifier (managed by Spark)
     """
+    log = logger or _default_logger
+
     df_exploded = batch_df.selectExpr(
         "`Meta Data`.`2. Symbol` as symbol",
         "`Meta Data`.`3. Last Refreshed` as last_refreshed",
@@ -42,5 +47,7 @@ def process_batch(batch_df: DataFrame, batch_id: int) -> None:
         col("prices.`5. volume`").alias("volume")
     )
 
+    row_count = df_flat.count()
+
     df_flat.write.format("delta").mode("append").save(BRONZE_INGESTION_PATH)
-    logging.info(f"✅ Batch {batch_id} — {df_flat.count()} rows written")
+    log.info("batch_written", batch_id=batch_id, rows=row_count)

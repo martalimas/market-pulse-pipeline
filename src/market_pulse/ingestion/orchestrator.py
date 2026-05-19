@@ -8,12 +8,17 @@ import time
 from market_pulse.config import STOCKS
 from market_pulse.ingestion.api import fetch_stock
 from market_pulse.ingestion.storage import save_to_bronze_databricks
+from market_pulse.logger import get_logger
+
+# Default logger (console only — no Delta persistence)
+_default_logger = get_logger(__name__)
 
 
 def ingest_all_stocks(
     stocks: list = STOCKS,
     api_key: str = None,
     dbutils=None,
+    logger=None,
     sleep_seconds: float = 1.5
 ) -> tuple[list, list]:
     """
@@ -30,8 +35,13 @@ def ingest_all_stocks(
     Returns:
         Tuple of (successful_paths, failed_symbols)
     """
+    log = logger or _default_logger
+
     paths  = []
     errors = []
+
+    log.info("ingestion_started", total_stocks=len(stocks))
+
 
     for symbol in stocks:
         try:
@@ -39,10 +49,14 @@ def ingest_all_stocks(
             data = fetch_stock(symbol, api_key)
             path = save_to_bronze_databricks(symbol, data, dbutils)
             paths.append(path)
+            log.info("stock_saved", symbol=symbol, path=path)
             time.sleep(sleep_seconds)
         except Exception as e:
-            logging.error(f"❌ Error processing {symbol}: {e}")
+            log.error("stock_failed", symbol=symbol, error=str(e))
             errors.append(symbol)
 
-    logging.info(f"✅ Complete: {len(paths)} saved, {len(errors)} errors")
+    log.info("ingestion_complete",
+             saved=len(paths),
+             failed=len(errors),
+             failed_symbols=errors)
     return paths, errors

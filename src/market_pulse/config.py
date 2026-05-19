@@ -31,3 +31,5 @@ SECRET_EH_CONNECTION = "eventhub-connection-string"
 
 #ADLS
 CONTAINER = "bronze"
+#Observability 
+PIPELINE_LOG_PATH = f"abfss://observability@{STORAGE_ACCOUNT}.dfs.core.windows.net/pipeline_logs/"

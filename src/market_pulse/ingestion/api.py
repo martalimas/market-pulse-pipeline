@@ -1,9 +1,11 @@
 # src/market_pulse/01_ingestion/api.py
 # Single Responsibility: HTTP call only
 
-import logging
+from market_pulse.logger import get_logger
 import requests
 from market_pulse.config import ALPHA_VANTAGE_URL, ALPHA_VANTAGE_OUTPUT_SIZE
+
+logger = get_logger(__name__)
 
 
 def fetch_stock(symbol: str, api_key: str) -> dict:
@@ -21,9 +23,13 @@ def fetch_stock(symbol: str, api_key: str) -> dict:
     data = response.json()
 
     if "Error Message" in data:
+        logger.error("api_error", symbol=symbol, message=data["Error Message"])
         raise ValueError(f"API error for {symbol}: {data['Error Message']}")
+
     if "Note" in data:
+        logger.warning("rate_limit_reached", symbol=symbol)
         raise ValueError(f"Rate limit reached: {data['Note']}")
 
-    logging.info(f"✅ {symbol} — {len(data.get('Time Series (Daily)', {}))} days received")
+    days = len(data.get("Time Series (Daily)", {}))
+    logger.info("stock_fetched", symbol=symbol, days=days)
     return data

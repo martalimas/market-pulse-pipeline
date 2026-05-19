@@ -16,17 +16,22 @@ from market_pulse.config import (
     GOLD_STOCK_COMPARISON_PATH
 )
 
+from market_pulse.logger import get_logger
+_default_logger = get_logger(__name__)
 
-def read_silver_fact_prices(spark: SparkSession) -> DataFrame:
+
+def read_silver_fact_prices(spark: SparkSession, logger=None) -> DataFrame:
     """Reads Silver fact_prices Delta table."""
+    log = logger or _default_logger
     df = spark.read.format("delta").load(SILVER_FACT_PRICES_PATH)
-    logging.info(f"✅ Silver fact_prices loaded — {df.count()} rows")
+    log.info("silver_loaded", rows=df.count())
     return df
 
 
-def build_daily_summary(df_fact: DataFrame) -> DataFrame:
+def build_daily_summary(df_fact: DataFrame, logger=None) -> DataFrame:
     """Daily metrics: return %, intraday range and range %."""
-    return (
+    log = logger or _default_logger
+    df = (
         df_fact
         .withColumn("daily_return_pct",
             F.when(F.col("open") != 0,
@@ -38,10 +43,13 @@ def build_daily_summary(df_fact: DataFrame) -> DataFrame:
                 F.round(((F.col("high") - F.col("low")) / F.col("open")) * 100, 2)))
         .withColumn("ingest_timestamp", F.current_timestamp())
     )
+    log.info("daily_summary_built", rows=df.count())
+    return df
 
 
-def build_volume_analysis(spark: SparkSession) -> DataFrame:
+def build_volume_analysis(spark: SparkSession, logger=None) -> DataFrame:
     """Volume metrics: 30d rolling average, volume vs avg %, high volume flag."""
+    log = logger or _default_logger
     query = f"""
     WITH volume_data AS (
         SELECT symbol, trade_date, volume,
@@ -59,11 +67,14 @@ def build_volume_analysis(spark: SparkSession) -> DataFrame:
         ingest_timestamp
     FROM volume_data
     """
-    return spark.sql(query)
+    df = spark.sql(query)
+    log.info("volume_analysis_built", rows=df.count())
+    return df
 
 
-def build_moving_averages(spark: SparkSession) -> DataFrame:
+def build_moving_averages(spark: SparkSession, logger=None) -> DataFrame:
     """SMA 7d and 30d with bullish/bearish signal."""
+    log = logger or _default_logger
     query = f"""
     WITH sma_data AS (
         SELECT symbol, trade_date, close,
@@ -81,11 +92,14 @@ def build_moving_averages(spark: SparkSession) -> DataFrame:
         ingest_timestamp
     FROM sma_data
     """
-    return spark.sql(query)
+    df = spark.sql(query)
+    log.info("moving_averages_built", rows=df.count())
+    return df
 
 
-def build_volatility(spark: SparkSession) -> DataFrame:
+def build_volatility(spark: SparkSession, logger=None) -> DataFrame:
     """Rolling volatility (STDDEV of daily returns) over 7d and 30d."""
+    log = logger or _default_logger
     query = f"""
     WITH with_prev AS (
         SELECT symbol, trade_date, close,
@@ -107,11 +121,14 @@ def build_volatility(spark: SparkSession) -> DataFrame:
         CURRENT_TIMESTAMP() AS ingest_timestamp
     FROM daily_returns
     """
-    return spark.sql(query)
+    df = spark.sql(query)
+    log.info("volatility_built", rows=df.count())
+    return df
 
 
-def build_stock_comparison(spark: SparkSession) -> DataFrame:
+def build_stock_comparison(spark: SparkSession, logger=None) -> DataFrame:
     """Cumulative return since start with daily rank across stocks."""
+    log = logger or _default_logger
     query = f"""
     WITH with_start AS (
         SELECT symbol, trade_date, close,
@@ -131,6 +148,8 @@ def build_stock_comparison(spark: SparkSession) -> DataFrame:
         CURRENT_TIMESTAMP() AS ingest_timestamp
     FROM with_start
     """
-    return spark.sql(query)
+    df = spark.sql(query)
+    log.info("stock_comparison_built", rows=df.count())
+    return df
 
 
