@@ -1,6 +1,6 @@
 # src/market_pulse/01_ingestion/api.py
 # Single Responsibility: HTTP call only
-
+import logging
 from market_pulse.logger import get_logger
 import requests
 from market_pulse.config import ALPHA_VANTAGE_URL, ALPHA_VANTAGE_OUTPUT_SIZE
@@ -29,8 +29,6 @@ class InvalidSymbolError(Exception):
     wait=wait_exponential(multiplier=1, min=1, max=8), # backoff: 1s, 2s, 4s
     before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING)
 )
-
-
 def fetch_stock(symbol: str, api_key: str) -> dict:
     """
     Calls Alpha Vantage API. No storage, no orchestration.
@@ -46,12 +44,12 @@ def fetch_stock(symbol: str, api_key: str) -> dict:
     data = response.json()
 
     if "Error Message" in data:
-        logger.error("api_error", symbol=symbol, message=data["Error Message"])
-        raise ValueError(f"API error for {symbol}: {data['Error Message']}")
+        logger.error("invalid_symbol", symbol=symbol, message=data["Error Message"])
+        raise InvalidSymbolError(f"Invalid symbol: {symbol}")
 
     if "Note" in data:
-        logger.warning("rate_limit_reached", symbol=symbol)
-        raise ValueError(f"Rate limit reached: {data['Note']}")
+        logger.warning("rate_limit", symbol=symbol)
+        raise RateLimitError(f"Rate limit reached for {symbol}")
 
     days = len(data.get("Time Series (Daily)", {}))
     logger.info("stock_fetched", symbol=symbol, days=days)
