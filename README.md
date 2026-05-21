@@ -1,17 +1,21 @@
 # Market Pulse Pipeline
 
-End-to-end financial data pipeline using **Azure Databricks**, **Delta Lake** and **Enhanced Medallion Architecture**.
+End-to-end financial data pipeline using **Azure Databricks**, **Delta Lake** and an **Enhanced Medallion Architecture** — built with production engineering practices: SOLID code structure, unit tests, structured observability, automated maintenance and robust error handling.
 
-**Repository:** [github.com/martalimas/market-pulse-pipeline](https://github.com/martalimas/market-pulse-pipeline)  
-**Status:** 🔧 Stage 2 — Multi-source Ingestion in progress
+**Repository:** [github.com/martalimas/market-pulse-pipeline](https://github.com/martalimas/market-pulse-pipeline)
+**Status:** ✅ Stage 3 — Production Hardening complete · 🔧 Stage 4 — DataOps next
 
 ---
 
 ## Objective
 
-Build a production-ready data pipeline that ingests real-world stock market data through three distinct ingestion patterns (batch, micro-batch, streaming), processes it through the Medallion architecture, and exposes analytical metrics through a final dashboard.
+Build a production-ready data pipeline that ingests real-world stock market data through three distinct ingestion patterns (batch, micro-batch, streaming), processes it through the Medallion architecture, and exposes analytical metrics through a live dashboard.
 
-The project demonstrates both **imperative** and **declarative (DLT)** approaches, and deliberately shows the **evolution from batch to incremental to streaming** — mirroring real-world data engineering practices.
+The project deliberately demonstrates **the evolution of a real data engineering project**:
+
+- Both **imperative** (PySpark) and **declarative** (DLT) approaches, side by side.
+- The progression from **batch → incremental → streaming** ingestion.
+- The refactor from **prototype notebooks** to a **SOLID, tested, observable Python codebase** — mirroring how a project matures in industry.
 
 ---
 
@@ -37,6 +41,7 @@ The project demonstrates both **imperative** and **declarative (DLT)** approache
 │  /bronze/streaming/      ← Event Hubs stream target    ⚠️   │
 │  /silver/                ← Silver layer                ✅   │
 │  /gold/                  ← Gold layer                  ✅   │
+│  /observability/         ← Structured pipeline logs    ✅   │
 │                                                             │
 └───────────────────────┬─────────────────────────────────────┘
                         │
@@ -50,23 +55,25 @@ The project demonstrates both **imperative** and **declarative (DLT)** approache
 │  BRONZE INGESTION  Flattened Delta table                    │
 │        ↓           02_bronze_autoloader (Auto Loader)  ✅   │
 │                    Incremental append + checkpoint          │
+│                    + schema enforcement                     │
 │                                                             │
 │  SILVER            Typed · Deduplicated · Validated         │
 │        ↓           Imperative (PySpark)                ✅   │
 │                    Declarative (DLT + Expectations)    ✅   │
 │                                                             │
-│  GOLD              Analytical metrics                       │
+│  GOLD              Analytical metrics (5)                   │
 │                    Imperative (PySpark + Spark SQL)    ✅   │
 │                    Declarative (DLT)                   ✅   │
 │                                                             │
-│  Orchestration: Lakeflow Jobs (end-to-end DAG)         ✅   │
+│  Orchestration: Lakeflow Jobs (v1, v2-SOLID, maint.)   ✅   │
+│  Observability: Structured JSON logs → Delta table     ✅   │
 │                                                             │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  VISUALIZATION                              │
-│  Databricks SQL Dashboard                              ⏳   │
+│  Databricks SQL Dashboard — 5 widgets                  ✅   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -82,6 +89,8 @@ The project demonstrates both **imperative** and **declarative (DLT)** approache
 | **Azure Event Hubs** | Streaming ingestion | Basic | ⚠️ |
 | **Azure Function** | Automated API caller | Consumption | ⏳ |
 | **GitHub** | Version control | Free | ✅ |
+| **pytest** | Unit testing | — | ✅ |
+| **tenacity** | Retry / backoff | — | ✅ |
 
 ---
 
@@ -100,6 +109,33 @@ The project demonstrates both **imperative** and **declarative (DLT)** approache
 
 ---
 
+## Code Architecture — SOLID `src/` package
+
+In Stage 3, all business logic was extracted from prototype notebooks into a tested, reusable Python package following the **Single Responsibility Principle**. Each module does one thing.
+
+```
+src/market_pulse/
+├── config.py                  ← all paths, constants, Key Vault config
+├── utils.py                   ← write_delta_table (generic Delta writer)
+├── logger.py                  ← StructuredLogger + get_logger factory
+├── ingestion/
+│   ├── api.py                 ← fetch_stock (HTTP only, tenacity retry)
+│   ├── storage.py             ← save_to_bronze (Databricks + Azure SDK)
+│   └── orchestrator.py        ← ingest_all_stocks (coordinates api + storage)
+├── bronze/
+│   ├── schema.py              ← Alpha Vantage JSON schema (MapType)
+│   └── transformations.py     ← process_batch (foreachBatch flatten)
+├── silver/
+│   ├── transformations.py     ← read_bronze, build_dim_stock, build_fact_prices
+│   └── validation.py          ← validate_dim_stock, validate_fact_prices
+└── gold/
+    └── metrics.py             ← 5 Gold metric builders
+```
+
+**The notebooks became thin orchestration layers** (`*_v2`) that import from `src/`. The original notebooks are kept as a record of the project's evolution — prototype to production.
+
+---
+
 ## Medallion Layers
 
 ### Bronze Landing
@@ -112,31 +148,30 @@ The project demonstrates both **imperative** and **declarative (DLT)** approache
 - Flattened Delta table built incrementally from Bronze Landing
 - **Stage 1:** Full overwrite batch (`02_bronze_to_ingestion`)
 - **Stage 2:** Auto Loader micro-batch (`02_bronze_autoloader`) — checkpoint-based, processes only new files
+- **Schema enforcement** — `failOnNewColumns` + `inferColumnTypes=false`: the pipeline fails fast on unexpected fields instead of propagating corrupt data
 - All fields kept as `STRING` — type casting delegated to Silver
 - Non-flat JSON (Alpha Vantage `Time Series (Daily)` uses dynamic date keys) — handled via `foreachBatch` + `explode(MapType)`
 
 ### Silver
 - Type casting: `trade_date` → DateType, prices → DoubleType, volume → LongType
 - Deduplication on `(symbol, trade_date)`
-- Data Quality Expectations (DLT):
+- Data Quality Expectations (DLT) / validation functions (imperative):
   - `open > 0`, `high > 0`, `low > 0`, `close > 0`
   - `volume >= 0`, `symbol IS NOT NULL`
 - Two tables: `dim_stock` (one row per symbol), `fact_prices` (one row per `symbol × trade_date`)
 - Two implementations: Imperative (PySpark) + Declarative (DLT)
 
 ### Gold
-- `daily_summary` — OHLCV per stock and day
-- `moving_averages` — 7-day and 30-day rolling averages
-- `volatility` — daily price standard deviation
-- `volume_analysis` — volume aggregations and anomalies
-- `stock_comparison` — relative performance across stocks
+- `daily_summary` — daily return %, intraday range
+- `moving_averages` — 7-day and 30-day SMA with bullish/bearish signal
+- `volatility` — rolling 7d/30d standard deviation of daily returns
+- `volume_analysis` — 30d rolling average, volume vs avg %, high-volume flag
+- `stock_comparison` — cumulative return since start, daily rank across stocks
 - Two implementations: Imperative (PySpark + Spark SQL) + Declarative (DLT)
 
 ---
 
 ## Ingestion Patterns — Evolution
-
-One of the core goals of this project is to demonstrate the evolution from simple batch to production-grade incremental and streaming ingestion:
 
 | Pattern | Notebook | Trigger | Behaviour |
 |---|---|---|---|
@@ -148,22 +183,81 @@ The migration from batch to Auto Loader required rewriting the transformation fr
 
 ---
 
+## Observability & Structured Logging
+
+Every pipeline run emits **structured JSON logs** that are both printed to the notebook output and persisted to a **Delta audit table** in a dedicated `observability` container.
+
+```python
+logger.info("dim_stock_built", rows=6)
+# → {"timestamp": "...", "level": "INFO", "module": "market_pulse.silver.transformations",
+#    "event": "dim_stock_built", "rows": 6}
+```
+
+The audit table makes the pipeline **queryable**:
+
+```sql
+-- How many rows were dropped during validation today?
+SELECT event, total, dropped
+FROM delta.`abfss://observability@.../pipeline_logs/`
+WHERE event = 'fact_prices_validated'
+  AND DATE(timestamp) = CURRENT_DATE()
+```
+
+A typical run logs ~13 events end to end (pipeline start/complete, rows loaded/built per layer, rows dropped in validation), giving full visibility into what ran, when, and how much data moved.
+
+---
+
+## Testing
+
+Unit tests with **pytest**, using mocks (no live API calls) and a Databricks-compatible Spark fixture.
+
+```
+tests/
+├── conftest.py                ← fixtures (sample API responses, Spark session)
+├── test_bronze_ingestion.py   ← fetch_stock: success + invalid symbol
+├── test_silver.py             ← dim/fact build + validation drops
+└── test_gold.py               ← daily_summary columns, return calc, zero-open guard
+```
+
+9 tests covering the core logic of every layer.
+
+---
+
+## Error Handling — Retry with Backoff
+
+API calls use **tenacity** with exponential backoff and typed exceptions:
+
+- `RateLimitError` → **retryable** (3 attempts, waits 1s → 2s → 4s)
+- `InvalidSymbolError` → **not retryable** (fails immediately — retrying an invalid ticker is pointless)
+
+```python
+@retry(
+    retry=retry_if_exception_type(RateLimitError),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+)
+def fetch_stock(symbol, api_key): ...
+```
+
+Documented in `docs/error_handling_retry.md`.
+
+---
+
 ## Orchestration — Lakeflow Jobs
 
-Full pipeline orchestrated as a DAG:
+Three jobs run the platform:
 
-```
-bronze_ingestion
-        ↓
-bronze_autoloader
-        ↓           ↓
-silver_imperative   silver_declarative
-        ↓                   ↓
-gold_imperative     gold_declarative
-```
+| Job | Purpose | Schedule |
+|---|---|---|
+| `market-pulse-pipeline` | v1 — imperative + DLT (feeds the dashboard) | Manual / scheduled |
+| `market-pulse-pipeline-v2` | Stage 3 — SOLID, imports from `src/` | Manual / scheduled |
+| `market-pulse-maintenance` | OPTIMIZE + Z-ORDER on all Delta tables | Weekly (Sun 02:00) |
 
-Silver and Gold layers run in parallel (imperative + declarative).  
+**v2 DAG:** `bronze_ingestion → bronze_autoloader → silver_imperative → gold_imperative`
 Full pipeline completes in ~3 minutes on Serverless compute.
+
+### Maintenance job
+`08_maintenance` runs `OPTIMIZE` + `ZORDER BY (symbol, trade_date)` across all 8 Delta tables to compact small files and co-locate frequently filtered data. Results are logged to the observability table as a maintenance report.
 
 ---
 
@@ -173,13 +267,13 @@ Full pipeline completes in ~3 minutes on Serverless compute.
 The Alpha Vantage JSON uses dynamic date keys in `Time Series (Daily)`, making it a `MapType` in Spark. Direct streaming transformations on nested structs with special characters are unsupported in Serverless. Solution: `foreachBatch` processes each micro-batch as a standard batch DataFrame with full API access.
 
 ### Event Hubs — Serverless networking limitation
-Serverless compute has restricted outbound network access. The Kafka endpoint (port 9093) is unreachable from Serverless clusters. In production this would run on a Classic cluster or with VNet injection. Code is implemented and correct — limitation is infrastructure, not logic.
+Serverless compute has restricted outbound network access. The Kafka endpoint (port 9093) is unreachable from Serverless clusters. In production this would run on a Classic cluster or with VNet injection. Code is implemented and correct — the limitation is infrastructure, not logic.
 
 ### Streaming trigger — `availableNow` vs `processingTime`
-Serverless does not support continuous streaming triggers (`processingTime`). All streaming uses `availableNow=True` (micro-batch). True continuous streaming requires Classic cluster.
+Serverless does not support continuous streaming triggers (`processingTime`). All streaming uses `availableNow=True` (micro-batch). True continuous streaming requires a Classic cluster.
 
-### Kafka shading in Serverless
-Serverless uses a shaded Kafka distribution. SASL authentication requires `kafkashaded.org.apache.kafka` prefix instead of `org.apache.kafka`.
+### `write_delta_table` — generic by mechanism, not by policy
+The shared writer handles the *how* (Delta format, mode, partitioning); the *what* and the write mode (`overwrite` vs `append`) are decided by each calling layer. This keeps `utils.py` free of business logic.
 
 ---
 
@@ -188,6 +282,8 @@ Serverless uses a shaded Kafka distribution. SASL authentication requires `kafka
 ```
 market-pulse-pipeline/
 ├── README.md
+├── requirements.txt                    ← tenacity, pyspark, requests, azure SDKs
+├── pytest.ini
 ├── config/
 │   └── alpha_vantage_schema.json       ← metadata-driven field mapping
 ├── docs/
@@ -195,17 +291,26 @@ market-pulse-pipeline/
 │   ├── infrastructure_setup.md
 │   ├── architecture_decisions.md
 │   ├── 02_bronze_autoloader_doc.md     ← Auto Loader design + migration
-│   └── 07_bronze_streaming_eventhubs_doc.md ← Event Hubs + Serverless limits
-├── 01_bronze_ingestion                 ← API → Bronze Landing (JSON)
+│   ├── 07_bronze_streaming_eventhubs_doc.md ← Event Hubs + Serverless limits
+│   └── error_handling_retry.md         ← retry / backoff patterns
+├── src/market_pulse/                   ← SOLID package (see Code Architecture)
+│   ├── config.py · utils.py · logger.py
+│   ├── ingestion/ · bronze/ · silver/ · gold/
+├── tests/                              ← pytest suite (9 tests)
+├── azure_function/                     ← Azure Function (code complete, no deploy)
+├── 01_bronze_ingestion        + _v2    ← API → Bronze Landing
+├── 02_bronze_autoloader       + _v2    ← Auto Loader micro-batch
 ├── 02_bronze_to_ingestion              ← Batch ingestion (Stage 1, reference)
-├── 02_bronze_autoloader                ← Auto Loader micro-batch (Stage 2)
-├── 03_silver_imperative                ← Silver PySpark
-├── 04_silver_declarative               ← Silver DLT
-├── 05_gold_imperative                  ← Gold PySpark + Spark SQL
-├── 06_gold_declarative                 ← Gold DLT
-├── 07_bronze_streaming_eventhubs       ← Event Hubs streaming (Stage 2)
+├── 03_silver_imperative       + _v2    ← Silver PySpark
+├── 04_silver_declarative.py            ← Silver DLT
+├── 05_gold_imperative         + _v2    ← Gold PySpark + Spark SQL
+├── 06_gold_declarative.py              ← Gold DLT
+├── 07_bronze_streaming_eventhubs       ← Event Hubs streaming
+├── 08_maintenance                      ← OPTIMIZE + Z-ORDER (weekly)
 └── connection-test                     ← ADLS connectivity test
 ```
+
+> Note: `*_v2` notebooks are the Stage 3 thin orchestration layers importing from `src/`. The originals are kept to show the prototype-to-production evolution.
 
 ---
 
@@ -220,8 +325,8 @@ market-pulse-pipeline/
 
 ## Setup
 
-For infrastructure setup: [`docs/infrastructure_setup.md`](docs/infrastructure_setup.md)  
-For staged roadmap and progress: [`docs/ROADMAP.md`](docs/ROADMAP.md)  
+For infrastructure setup: [`docs/infrastructure_setup.md`](docs/infrastructure_setup.md)
+For staged roadmap and progress: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 For architectural decisions: [`docs/architecture_decisions.md`](docs/architecture_decisions.md)
 
 ---
@@ -238,22 +343,30 @@ For architectural decisions: [`docs/architecture_decisions.md`](docs/architectur
    Gold (imperative + DLT, 5 metrics)
    Unity Catalog schemas
 
-🔧 Stage 2 — Multi-source Ingestion & Automation
+✅ Stage 2 — Multi-source Ingestion & Automation
    ✅ Auto Loader micro-batch (incremental Bronze ingestion)
    ✅ Lakeflow Jobs (end-to-end DAG, 3min runtime)
+   ✅ Databricks SQL Dashboard (5 widgets, live)
    ⚠️  Event Hubs streaming (code complete, Serverless network limitation)
-   ⏳  Azure Function (code pending, subscription limitation)
-   ⏳  Dashboard
+   ⏳  Azure Function (code complete, Free Trial deploy limitation)
 
-⏳ Stage 3 — Production Hardening
-   Tests, schema enforcement, structured logging, OPTIMIZE
+✅ Stage 3 — Production Hardening
+   ✅ SOLID src/market_pulse package (Single Responsibility)
+   ✅ Thin v2 orchestration notebooks
+   ✅ pytest suite (9 tests, mocked)
+   ✅ Schema enforcement (failOnNewColumns)
+   ✅ Structured JSON logging → Delta observability table
+   ✅ OPTIMIZE + Z-ORDER weekly maintenance job
+   ✅ Robust error handling (tenacity, typed exceptions, backoff)
 
-⏳ Stage 4 — DataOps & CI/CD
-   GitHub Actions, scheduling, monitoring, dev/prod
+🔧 Stage 4 — DataOps & CI/CD
+   GitHub Actions (run pytest on push), Docker, scheduling, monitoring, dev/prod
 
 ⏳ Stage 5 — Advanced Patterns
-   SCD Type 2, RSI, ML integration, dbt
+   SCD Type 2, RSI, ML integration, time travel, dbt
 ```
+
+---
 
 ## Dashboard
 
@@ -264,10 +377,10 @@ Live dashboard built in Databricks SQL — 5 visualizations:
 - Stock performance — return since start (%)
 - Latest stock prices table
 
-🔗 [View Dashboard] https://adb-7405604908512990.10.azuredatabricks.net/dashboardsv3/01f150831ad81008a4631c4b52601185/published?o=7405604908512990
+🔗 [View Dashboard](https://adb-7405604908512990.10.azuredatabricks.net/dashboardsv3/01f150831ad81008a4631c4b52601185/published?o=7405604908512990)
 
 ---
 
-*Built as a portfolio project demonstrating end-to-end data engineering on Azure Databricks.  
-Stack: Azure ADLS Gen2 · Databricks Premium Serverless · Delta Lake · DLT · Lakeflow Jobs · Event Hubs · Key Vault  
-Last updated: May 2026*
+*Built as a portfolio project demonstrating end-to-end data engineering on Azure Databricks.*
+*Stack: Azure ADLS Gen2 · Databricks Premium Serverless · Delta Lake · DLT · Lakeflow Jobs · Event Hubs · Key Vault · pytest · tenacity*
+*Last updated: May 2026*
