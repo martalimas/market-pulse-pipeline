@@ -205,6 +205,9 @@ WHERE event = 'fact_prices_validated'
 
 A typical run logs ~13 events end to end (pipeline start/complete, rows loaded/built per layer, rows dropped in validation), giving full visibility into what ran, when, and how much data moved.
 
+![Observability Delta table](docs/screenshots/sc_observ_table.png)
+*Structured logs persisted to the observability Delta table — rows loaded, built and validated per layer.*
+
 ---
 
 ## Testing
@@ -256,8 +259,14 @@ Three jobs run the platform:
 **v2 DAG:** `bronze_ingestion → bronze_autoloader → silver_imperative → gold_imperative`
 Full pipeline completes in ~3 minutes on Serverless compute.
 
+![Lakeflow v2 DAG — end-to-end run](docs/screenshots/market-pulse-pipeline-v2_run.png)
+*The v2 (SOLID) pipeline running end to end on Serverless.*
+
 ### Maintenance job
 `08_maintenance` runs `OPTIMIZE` + `ZORDER BY (symbol, trade_date)` across all 8 Delta tables to compact small files and co-locate frequently filtered data. Results are logged to the observability table as a maintenance report.
+
+![Lakeflow v1 DAG — imperative + declarative](docs/screenshots/market-pulse-pipeline_run.png)
+*The v1 pipeline showing imperative and declarative (DLT) paths side by side.*
 
 ---
 
@@ -377,7 +386,10 @@ Live dashboard built in Databricks SQL — 5 visualizations:
 - Stock performance — return since start (%)
 - Latest stock prices table
 
+![Databricks SQL dashboard](docs/screenshots/maketpulsedashboard.png)
+
 🔗 [View Dashboard](https://adb-7405604908512990.10.azuredatabricks.net/dashboardsv3/01f150831ad81008a4631c4b52601185/published?o=7405604908512990)
+
 
 ---
 
