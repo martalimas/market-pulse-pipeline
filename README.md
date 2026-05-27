@@ -1,4 +1,5 @@
 # Market Pulse Pipeline
+![Tests](https://github.com/martalimas/market-pulse-pipeline/actions/workflows/tests.yml/badge.svg)
 
 End-to-end financial data pipeline using **Azure Databricks**, **Delta Lake** and an **Enhanced Medallion Architecture** — built with production engineering practices: SOLID code structure, unit tests, structured observability, automated maintenance and robust error handling.
 
