@@ -1,0 +1,10 @@
+# Linguist language detection overrides
+# Notebooks are prototype/exploration — don't count them as the primary language
+*.ipynb linguist-documentation
+
+# Mark the SOLID Python package as the primary detected code
+src/** linguist-detectable=true
+
+# Exclude generated / config noise from language stats
+docs/** linguist-documentation
+*.md linguist-documentation
