@@ -25,4 +25,6 @@ jobs:
           pip install pytest requests tenacity
 
       - name: Run bronze ingestion tests
+        env:
+          PYTHONPATH: src
         run: pytest tests/test_bronze_ingestion.py -v
