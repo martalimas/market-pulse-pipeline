@@ -138,4 +138,36 @@ This document records the key technical decisions made during the design and imp
 
 ---
 
+## 14. SCD Type 2 on `dim_stock`
+
+**Decision:** Implemented Slowly Changing Dimension Type 2 on `dim_stock`, storing history in a separate table `dim_stock_scd2` at `silver/dim_stock_scd2/` rather than overwriting the existing dimension.
+
+**Reasoning:** `dim_stock` holds metadata about each stock (last refresh timestamp, timezone). When that metadata changes, a simple overwrite loses the history of when the change occurred. SCD Type 2 preserves the full audit trail by closing the old record (`valid_to = current_date`, `is_current = FALSE`) and inserting a new active record (`valid_to = 9999-12-31`, `is_current = TRUE`). This enables point-in-time queries — joining `fact_prices` to the version of `dim_stock` that was active on any given date.
+
+**Implementation:** Delta Lake MERGE statement with three-way logic:
+- **MATCHED + changed attributes** → close existing row (`valid_to`, `is_current = FALSE`)
+- **NOT MATCHED** → insert new row with `valid_from = current_date`, `valid_to = 9999-12-31`, `is_current = TRUE`
+- A second INSERT opens the new version for rows that were closed in the same operation.
+
+**Schema additions:** `valid_from DATE`, `valid_to DATE`, `is_current BOOLEAN`
+
+**Alternatives considered:** SCD Type 1 (overwrite) — simpler but destroys history. SCD Type 2 with ARRAY OF STRUCT — more compact but harder to query with standard SQL and incompatible with Delta MERGE.
+
+---
+
+## 15. Time Travel
+
+**Decision:** Demonstrated Delta Lake Time Travel on pipeline tables using both `VERSION AS OF` and `TIMESTAMP AS OF` syntax.
+
+**Reasoning:** Time Travel is one of Delta Lake's most powerful features for production pipelines — it enables recovery from accidental overwrites, auditing of data at any point in history, and reproducible ML training datasets. Including Time Travel demonstrations in the project shows understanding of Delta Lake beyond basic read/write operations.
+
+**Use cases demonstrated:**
+- Querying a table as it existed at a previous version
+- Recovering data after an unintended transformation
+- Comparing current vs historical state of a metric
+
+**Retention:** Delta transaction log retains history for 30 days by default (`delta.logRetentionDuration`). VACUUM removes files older than the retention threshold — running VACUUM too aggressively breaks Time Travel.
+
+---
+
 *Last updated: May 2026*
