@@ -317,6 +317,8 @@ market-pulse-pipeline/
 ├── 06_gold_declarative.py              ← Gold DLT
 ├── 07_bronze_streaming_eventhubs       ← Event Hubs streaming
 ├── 08_maintenance                      ← OPTIMIZE + Z-ORDER (weekly)
+├── 09_scd_type2                        ← SCD Type 2 with MERGE (Stage 5)
+├── 10_time_travel                      ← Delta Lake Time Travel (Stage 5)
 └── connection-test                     ← ADLS connectivity test
 ```
 
@@ -372,8 +374,10 @@ For architectural decisions: [`docs/architecture_decisions.md`](docs/architectur
 🔧 Stage 4 — DataOps & CI/CD
    GitHub Actions (run pytest on push), Docker, scheduling, monitoring, dev/prod
 
-⏳ Stage 5 — Advanced Patterns
-   SCD Type 2, RSI, ML integration, time travel, dbt
+🔧 Stage 5 — Advanced Patterns
+   ✅ SCD Type 2 (MERGE-based historization on enriched dim_stock)
+   ✅ Delta Time Travel (version queries, table history)
+   ⏳ RSI, ML integration, dbt
 ```
 
 ---
