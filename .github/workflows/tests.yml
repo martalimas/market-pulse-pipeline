@@ -28,3 +28,11 @@ jobs:
         env:
           PYTHONPATH: src
         run: pytest tests/test_bronze_ingestion.py -v
+
+        # CERTO — quando tens múltiplas linhas no run
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=src/market_pulse --cov-report=xml
+    
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v3
